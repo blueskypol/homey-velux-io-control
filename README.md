@@ -231,12 +231,21 @@ delivering events again).
 
 ## Known limitations / follow-ups
 
-- `windowcoverings_set`'s percentage can show fractional digits (e.g. "6.98%") since it's the
-  stock capability's own `decimals: 2` on the underlying 0.0-1.0 value. An earlier attempt to
-  force whole percentages via `capabilitiesOptions: { decimals: 0 }` was reverted -- `decimals`
-  rounds the *stored* 0.0-1.0 value, not the displayed percentage, so `0` collapsed the entire
-  range to just `{0, 1}` (closed/fully open) and silently snapped any mid-drag slider value to
-  100% open. No fix attempted yet that doesn't reduce actual position resolution.
+- An earlier attempt to force whole percentages via `capabilitiesOptions: { decimals: 0 }` was
+  reverted -- `decimals` rounds the *stored* 0.0-1.0 value, not the displayed percentage, so `0`
+  collapsed the entire range to just `{0, 1}` (closed/fully open) and silently snapped any
+  mid-drag slider value to 100% open. `device.js` now rounds the firmware's reported position to
+  whole percent itself (see "Position mapping" above) before storing, which fixes the same
+  display goal without touching capability-declared precision.
+- Occasional brief SSE drops (a few seconds, self-recovering) still show up in Insights even
+  after the Gateway reconnect fixes above -- better than the original multi-hour stuck
+  disconnect, but not fully eliminated. Diagnosing further would need visibility this app
+  doesn't have from the Homey side (ESP32 WiFi signal quality, serial logs during a drop).
+- The Homey mobile app doesn't always live-refresh an already-open device screen the instant a
+  capability value changes -- navigating away and back (or re-opening the device) shows the
+  current value immediately. Confirmed the underlying value itself updates promptly and
+  correctly (`setCapabilityValue` is called as soon as the SSE event arrives); this is Homey
+  client-side rendering behavior, not something this app's code can control.
 - The device settings screen's **"Connected to"/"Aangesloten"** field (Zonnescherm/Jaloezieën &
   Lamellen/Gordijnen/Jaloezieën/Overig) is a **fixed Homey platform field** tied to the
   `windowcoverings` device class (`allowedVirtual`, confirmed in `homey-lib`'s
@@ -295,6 +304,11 @@ delivering events again).
   fighting it and producing a connect/disconnect loop); and the actual root cause of position
   feedback never updating after the first event was found by capturing the raw `/events` stream
   live while physically moving a window -- see "SSE event shape" above.
+- **Dispatch fix confirmed live by the device owner**: `window_state` now correctly shows
+  "Ventilatie" after pressing the ventilation button on both windows (the first time it ever
+  showed anything other than its initial-connect value), and the device-list summary tile
+  switches from a raw percentage to a proper "Open"/"Gesloten" label once a window has moved at
+  least once since the fix was installed.
 - **Still to verify**: a live Insights timeline check for `alarm_rain` (needs a human in the
   Homey mobile app after a real rain transition).
 
