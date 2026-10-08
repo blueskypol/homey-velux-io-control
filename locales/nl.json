@@ -1,0 +1,7 @@
+{
+  "device": {
+    "entityNameImmutable": "Dit veld is alleen informatief en kan hier niet gewijzigd worden -- het is de stabiele identiteit van dit apparaat. Heb je het raam in de firmware hernoemd, koppel het apparaat dan opnieuw.",
+    "noAddress": "Geen gateway-adres ingesteld. Gebruik Herstellen om er een in te stellen.",
+    "unreachable": "Gateway niet bereikbaar. Controleer of de home_io_control-hub aanstaat en op het netwerk zit, of gebruik Herstellen als het adres is gewijzigd."
+  }
+}

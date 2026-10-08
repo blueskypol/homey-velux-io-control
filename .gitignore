@@ -1,0 +1,8 @@
+node_modules/
+.homeyplugins.json
+env.json
+*.log
+
+
+# Added by Homey CLI
+/.homeybuild/

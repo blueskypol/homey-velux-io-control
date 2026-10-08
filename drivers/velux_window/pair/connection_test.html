@@ -1,0 +1,111 @@
+<style>
+  body { font-family: -apple-system, sans-serif; padding: 20px; }
+  .field { margin-bottom: 16px; }
+  label { display: block; font-weight: 600; margin-bottom: 6px; }
+  input[type=text] { width: 100%; box-sizing: border-box; padding: 10px; font-size: 16px; border: 1px solid #ccc; border-radius: 6px; }
+  .hint { color: #888; font-size: 13px; margin-top: 4px; }
+  button { width: 100%; padding: 12px; font-size: 16px; border-radius: 6px; border: none; background: #365eaa; color: white; cursor: pointer; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .error { color: #c0392b; font-size: 14px; margin-top: 10px; display: none; white-space: pre-wrap; }
+  .diag { margin-top: 20px; padding: 10px; background: #f5f5f5; border-radius: 6px; font-family: monospace; font-size: 12px; white-space: pre-wrap; }
+</style>
+<div class="field">
+  <label id="label-address">Gateway address</label>
+  <input type="text" id="address" placeholder="192.168.1.50 or hioc-velux-hub.local" autocomplete="off" />
+  <div class="hint" id="hint-address">The IP address or hostname of your home_io_control hub, reachable on port 80.</div>
+</div>
+<button id="next">Test connection</button>
+<div class="error" id="error"></div>
+<div class="diag" id="diag">diag: (script tag not yet reached)</div>
+
+<script type="application/javascript">
+  // NOTE: current Homey SDK3 pairing views do NOT use an onHomeyReady(Homey) callback --
+  // that convention is from an older SDK generation. `Homey` is already a global by the time
+  // this script tag runs; code executes directly at the top level. Confirmed against the
+  // current official docs (apps.developer.homey.app/advanced/custom-views/custom-pairing-views),
+  // whose own examples call Homey.* directly inside a plain <script> tag with no wrapper.
+  function diag(line) {
+    const el = document.getElementById('diag');
+    if (el) el.textContent += '\n' + line;
+  }
+  diag('top-level script executing, Homey=' + typeof Homey);
+
+  window.addEventListener('error', (event) => {
+    const el = document.getElementById('error');
+    if (!el) return;
+    el.textContent = 'Script error: ' + (event.message || event.error || event);
+    el.style.display = 'block';
+    diag('window error event: ' + (event.message || event.error));
+  });
+
+  const errorEl = document.getElementById('error');
+  const button = document.getElementById('next');
+  const addressInput = document.getElementById('address');
+  diag('DOM elements found: button=' + !!button + ' input=' + !!addressInput);
+
+  button.addEventListener('click', async () => {
+    diag('button clicked');
+    errorEl.style.display = 'none';
+    const address = addressInput.value.trim();
+    if (!address) {
+      errorEl.textContent = 'Enter an address first.';
+      errorEl.style.display = 'block';
+      return;
+    }
+
+    button.disabled = true;
+    button.textContent = 'Testing...';
+    Homey.showLoadingOverlay();
+
+    try {
+      diag('calling Homey.emit test_connection with address=' + address);
+      const result = await Homey.emit('test_connection', { address });
+      diag('Homey.emit resolved: ' + JSON.stringify(result));
+      if (result && result.success) {
+        Homey.nextView();
+      } else {
+        errorEl.textContent = 'Could not reach a home_io_control gateway at this address: '
+          + ((result && result.error) || '?');
+        errorEl.style.display = 'block';
+      }
+    } catch (err) {
+      diag('Homey.emit threw: ' + (err && err.message ? err.message : String(err)));
+      errorEl.textContent = 'Could not reach a home_io_control gateway at this address: '
+        + (err && err.message ? err.message : String(err));
+      errorEl.style.display = 'block';
+    } finally {
+      Homey.hideLoadingOverlay();
+      button.disabled = false;
+      button.textContent = 'Test connection';
+    }
+  });
+  diag('click listener attached');
+
+  try {
+    const strings = {
+      en: {
+        title: 'Connect to your gateway',
+        label: 'Gateway address',
+        hint: 'The IP address or hostname of your home_io_control hub, reachable on port 80.',
+        button: 'Test connection',
+      },
+      nl: {
+        title: 'Verbind met je gateway',
+        label: 'Gateway-adres',
+        hint: 'Het IP-adres of de hostnaam van je home_io_control-hub, bereikbaar op poort 80.',
+        button: 'Verbinding testen',
+      },
+    };
+    const detected = typeof Homey.getLanguage === 'function' ? Homey.getLanguage() : 'en';
+    diag('detected language: ' + detected);
+    const t = strings[detected] || strings.en;
+    document.getElementById('label-address').textContent = t.label;
+    document.getElementById('hint-address').textContent = t.hint;
+    button.textContent = t.button;
+    Homey.setTitle(t.title);
+  } catch (err) {
+    diag('translation step threw (non-fatal): ' + (err && err.message ? err.message : String(err)));
+  }
+
+  diag('script finished');
+</script>

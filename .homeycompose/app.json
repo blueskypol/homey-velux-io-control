@@ -1,0 +1,26 @@
+{
+  "id": "com.veluxhub.windows",
+  "version": "0.1.0",
+  "compatibility": ">=12.11.0",
+  "sdk": 3,
+  "platforms": ["local"],
+  "name": {
+    "en": "Velux Roof Windows (home_io_control)",
+    "nl": "Velux Dakramen (home_io_control)"
+  },
+  "description": {
+    "en": "Control VELUX roof windows directly over your local network, through a self-hosted ESPHome gateway running the home_io_control firmware -- no cloud, no vendor hub.",
+    "nl": "Bedien VELUX-dakramen rechtstreeks via je lokale netwerk, via een zelf gehoste ESPHome-gateway met de home_io_control-firmware -- geen cloud, geen fabrikantshub."
+  },
+  "category": ["climate"],
+  "permissions": [],
+  "images": {
+    "small": "/assets/images/small.png",
+    "large": "/assets/images/large.png",
+    "xlarge": "/assets/images/xlarge.png"
+  },
+  "author": {
+    "name": "Pieterjan Oomen"
+  },
+  "brandColor": "#365eaa"
+}

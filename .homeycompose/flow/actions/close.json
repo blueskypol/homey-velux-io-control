@@ -1,0 +1,17 @@
+{
+  "title": {
+    "en": "Close",
+    "nl": "Sluit"
+  },
+  "titleFormatted": {
+    "en": "Close",
+    "nl": "Sluit"
+  },
+  "args": [
+    {
+      "name": "device",
+      "type": "device",
+      "filter": "driver_id=velux_window"
+    }
+  ]
+}

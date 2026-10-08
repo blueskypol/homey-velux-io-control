@@ -1,0 +1,7 @@
+{
+  "device": {
+    "entityNameImmutable": "This field is informational only and can't be changed here -- it's this device's stable identity. If you renamed the cover in the firmware, re-pair the device instead.",
+    "noAddress": "No gateway address configured. Use Repair to set one.",
+    "unreachable": "Gateway unreachable. Check that the home_io_control hub is powered and on the network, or use Repair if its address changed."
+  }
+}

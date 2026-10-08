@@ -1,0 +1,69 @@
+{
+  "id": "velux_window",
+  "name": {
+    "en": "Velux Roof Window",
+    "nl": "Velux Dakraam"
+  },
+  "class": "windowcoverings",
+  "images": {
+    "small": "{{driverAssetsPath}}/images/small.png",
+    "large": "{{driverAssetsPath}}/images/large.png",
+    "xlarge": "{{driverAssetsPath}}/images/xlarge.png"
+  },
+  "platforms": ["local"],
+  "connectivity": ["lan"],
+  "capabilities": [
+    "windowcoverings_state",
+    "windowcoverings_set",
+    "button.ventilation",
+    "alarm_rain",
+    "alarm_rain_stale",
+    "alarm_connectivity"
+  ],
+  "capabilitiesOptions": {
+    "button.ventilation": {
+      "title": {
+        "en": "Ventilation position",
+        "nl": "Ventilatiestand"
+      }
+    },
+    "alarm_connectivity": {
+      "title": {
+        "en": "Reachable",
+        "nl": "Bereikbaar"
+      }
+    }
+  },
+  "pair": [
+    { "id": "connection_test" },
+    {
+      "id": "list_devices",
+      "template": "list_devices",
+      "navigation": { "next": "add_devices" }
+    },
+    { "id": "add_devices", "template": "add_devices" }
+  ],
+  "repair": [
+    { "id": "repair_connection" }
+  ],
+  "settings": [
+    {
+      "id": "address",
+      "type": "text",
+      "label": { "en": "Gateway address", "nl": "Gateway-adres" },
+      "hint": {
+        "en": "IP address or hostname of the ESPHome hub (home_io_control). If the hub's address changes (e.g. a new DHCP lease), update it here or use Repair.",
+        "nl": "IP-adres of hostnaam van de ESPHome-hub (home_io_control). Als het adres van de hub verandert (bijv. een nieuwe DHCP-lease), werk het hier bij of gebruik Herstellen."
+      }
+    },
+    {
+      "id": "entityName",
+      "type": "text",
+      "label": { "en": "Firmware entity name", "nl": "Firmware-entiteitnaam" },
+      "hint": {
+        "en": "The exact `name:` of this cover in the ESPHome YAML config. This is this device's stable identity -- renaming it in the firmware orphans this Homey device; re-pair instead.",
+        "nl": "De exacte `name:` van dit raam in de ESPHome-YAML-configuratie. Dit is de stabiele identiteit van dit apparaat -- hernoemen in de firmware maakt dit Homey-apparaat wees; koppel in dat geval opnieuw."
+      }
+    }
+  ]
+}

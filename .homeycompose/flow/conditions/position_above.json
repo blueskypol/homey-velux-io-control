@@ -1,0 +1,25 @@
+{
+  "title": {
+    "en": "Position !{{is|isn't}} higher than [[percentage]]%",
+    "nl": "Positie !{{is|is niet}} hoger dan [[percentage]]%"
+  },
+  "titleFormatted": {
+    "en": "Position !{{is|isn't}} higher than [[percentage]]%",
+    "nl": "Positie !{{is|is niet}} hoger dan [[percentage]]%"
+  },
+  "args": [
+    {
+      "name": "device",
+      "type": "device",
+      "filter": "driver_id=velux_window"
+    },
+    {
+      "name": "percentage",
+      "type": "number",
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "placeholder": { "en": "50", "nl": "50" }
+    }
+  ]
+}

@@ -1,0 +1,85 @@
+<style>
+  body { font-family: -apple-system, sans-serif; padding: 20px; }
+  .field { margin-bottom: 16px; }
+  label { display: block; font-weight: 600; margin-bottom: 6px; }
+  input[type=text] { width: 100%; box-sizing: border-box; padding: 10px; font-size: 16px; border: 1px solid #ccc; border-radius: 6px; }
+  .hint { color: #888; font-size: 13px; margin-top: 4px; }
+  button { width: 100%; padding: 12px; font-size: 16px; border-radius: 6px; border: none; background: #365eaa; color: white; cursor: pointer; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .error { color: #c0392b; font-size: 14px; margin-top: 10px; display: none; white-space: pre-wrap; }
+</style>
+<div class="field">
+  <label id="label-address">Gateway address</label>
+  <input type="text" id="address" placeholder="192.168.1.50 or hioc-velux-hub.local" autocomplete="off" />
+  <div class="hint" id="hint-address">Enter the (possibly new) IP address or hostname of the gateway that controls this window.</div>
+</div>
+<button id="next">Reconnect</button>
+<div class="error" id="error"></div>
+
+<script type="application/javascript">
+  // See connection_test.html for why there's no onHomeyReady(Homey) wrapper here -- `Homey`
+  // is already a global by the time this script runs, confirmed against the current official
+  // docs (apps.developer.homey.app/advanced/custom-views/custom-pairing-views).
+  window.addEventListener('error', (event) => {
+    const el = document.getElementById('error');
+    if (!el) return;
+    el.textContent = 'Script error: ' + (event.message || event.error || event);
+    el.style.display = 'block';
+  });
+
+  const errorEl = document.getElementById('error');
+  const button = document.getElementById('next');
+  const addressInput = document.getElementById('address');
+
+  button.addEventListener('click', async () => {
+    errorEl.style.display = 'none';
+    const address = addressInput.value.trim();
+    if (!address) {
+      errorEl.textContent = 'Enter an address first.';
+      errorEl.style.display = 'block';
+      return;
+    }
+
+    button.disabled = true;
+    button.textContent = 'Testing...';
+    Homey.showLoadingOverlay();
+
+    try {
+      const result = await Homey.emit('test_connection', { address });
+      if (result && result.success) {
+        Homey.done();
+      } else {
+        errorEl.textContent = 'Could not reconnect: ' + ((result && result.error) || '?');
+        errorEl.style.display = 'block';
+      }
+    } catch (err) {
+      errorEl.textContent = 'Could not reconnect: ' + (err && err.message ? err.message : String(err));
+      errorEl.style.display = 'block';
+    } finally {
+      Homey.hideLoadingOverlay();
+      button.disabled = false;
+      button.textContent = 'Reconnect';
+    }
+  });
+
+  try {
+    const strings = {
+      en: { title: 'Reconnect this window', label: 'Gateway address', hint: 'Enter the (possibly new) IP address or hostname of the gateway that controls this window.', button: 'Reconnect' },
+      nl: { title: 'Dit raam opnieuw verbinden', label: 'Gateway-adres', hint: 'Vul het (mogelijk nieuwe) IP-adres of de hostnaam in van de gateway die dit raam bedient.', button: 'Opnieuw verbinden' },
+    };
+    const detected = typeof Homey.getLanguage === 'function' ? Homey.getLanguage() : 'en';
+    const t = strings[detected] || strings.en;
+    document.getElementById('label-address').textContent = t.label;
+    document.getElementById('hint-address').textContent = t.hint;
+    button.textContent = t.button;
+    Homey.setTitle(t.title);
+  } catch (err) {
+    // Swallow -- English defaults (already in the static HTML) still work fine.
+  }
+
+  if (typeof Homey.getSetting === 'function') {
+    Homey.getSetting('address').then((value) => {
+      if (value) addressInput.value = value;
+    }).catch(() => {});
+  }
+</script>

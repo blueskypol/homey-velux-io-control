@@ -1,0 +1,17 @@
+{
+  "title": {
+    "en": "Stop",
+    "nl": "Stop"
+  },
+  "titleFormatted": {
+    "en": "Stop",
+    "nl": "Stop"
+  },
+  "args": [
+    {
+      "name": "device",
+      "type": "device",
+      "filter": "driver_id=velux_window"
+    }
+  ]
+}

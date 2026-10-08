@@ -1,0 +1,17 @@
+{
+  "title": {
+    "en": "Open",
+    "nl": "Open"
+  },
+  "titleFormatted": {
+    "en": "Open",
+    "nl": "Open"
+  },
+  "args": [
+    {
+      "name": "device",
+      "type": "device",
+      "filter": "driver_id=velux_window"
+    }
+  ]
+}

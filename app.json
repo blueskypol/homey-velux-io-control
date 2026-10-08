@@ -1,0 +1,256 @@
+{
+  "_comment": "This file is generated. Please edit .homeycompose/app.json instead.",
+  "id": "com.veluxhub.windows",
+  "version": "0.1.0",
+  "compatibility": ">=12.11.0",
+  "sdk": 3,
+  "platforms": [
+    "local"
+  ],
+  "name": {
+    "en": "Velux Roof Windows (home_io_control)",
+    "nl": "Velux Dakramen (home_io_control)"
+  },
+  "description": {
+    "en": "Control VELUX roof windows directly over your local network, through a self-hosted ESPHome gateway running the home_io_control firmware -- no cloud, no vendor hub.",
+    "nl": "Bedien VELUX-dakramen rechtstreeks via je lokale netwerk, via een zelf gehoste ESPHome-gateway met de home_io_control-firmware -- geen cloud, geen fabrikantshub."
+  },
+  "category": [
+    "climate"
+  ],
+  "permissions": [],
+  "images": {
+    "small": "/assets/images/small.png",
+    "large": "/assets/images/large.png",
+    "xlarge": "/assets/images/xlarge.png"
+  },
+  "author": {
+    "name": "Pieterjan Oomen"
+  },
+  "brandColor": "#365eaa",
+  "flow": {
+    "conditions": [
+      {
+        "title": {
+          "en": "Position !{{is|isn't}} higher than [[percentage]]%",
+          "nl": "Positie !{{is|is niet}} hoger dan [[percentage]]%"
+        },
+        "titleFormatted": {
+          "en": "Position !{{is|isn't}} higher than [[percentage]]%",
+          "nl": "Positie !{{is|is niet}} hoger dan [[percentage]]%"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=velux_window"
+          },
+          {
+            "name": "percentage",
+            "type": "number",
+            "min": 0,
+            "max": 100,
+            "step": 1,
+            "placeholder": {
+              "en": "50",
+              "nl": "50"
+            }
+          }
+        ],
+        "id": "position_above"
+      },
+      {
+        "title": {
+          "en": "Position !{{is|isn't}} lower than [[percentage]]%",
+          "nl": "Positie !{{is|is niet}} lager dan [[percentage]]%"
+        },
+        "titleFormatted": {
+          "en": "Position !{{is|isn't}} lower than [[percentage]]%",
+          "nl": "Positie !{{is|is niet}} lager dan [[percentage]]%"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=velux_window"
+          },
+          {
+            "name": "percentage",
+            "type": "number",
+            "min": 0,
+            "max": 100,
+            "step": 1,
+            "placeholder": {
+              "en": "50",
+              "nl": "50"
+            }
+          }
+        ],
+        "id": "position_below"
+      }
+    ],
+    "actions": [
+      {
+        "title": {
+          "en": "Close",
+          "nl": "Sluit"
+        },
+        "titleFormatted": {
+          "en": "Close",
+          "nl": "Sluit"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=velux_window"
+          }
+        ],
+        "id": "close"
+      },
+      {
+        "title": {
+          "en": "Open",
+          "nl": "Open"
+        },
+        "titleFormatted": {
+          "en": "Open",
+          "nl": "Open"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=velux_window"
+          }
+        ],
+        "id": "open"
+      },
+      {
+        "title": {
+          "en": "Stop",
+          "nl": "Stop"
+        },
+        "titleFormatted": {
+          "en": "Stop",
+          "nl": "Stop"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=velux_window"
+          }
+        ],
+        "id": "stop"
+      }
+    ]
+  },
+  "drivers": [
+    {
+      "id": "velux_window",
+      "name": {
+        "en": "Velux Roof Window",
+        "nl": "Velux Dakraam"
+      },
+      "class": "windowcoverings",
+      "images": {
+        "small": "/drivers/velux_window/assets/images/small.png",
+        "large": "/drivers/velux_window/assets/images/large.png",
+        "xlarge": "/drivers/velux_window/assets/images/xlarge.png"
+      },
+      "platforms": [
+        "local"
+      ],
+      "connectivity": [
+        "lan"
+      ],
+      "capabilities": [
+        "windowcoverings_state",
+        "windowcoverings_set",
+        "button.ventilation",
+        "alarm_rain",
+        "alarm_rain_stale",
+        "alarm_connectivity"
+      ],
+      "capabilitiesOptions": {
+        "button.ventilation": {
+          "title": {
+            "en": "Ventilation position",
+            "nl": "Ventilatiestand"
+          }
+        },
+        "alarm_connectivity": {
+          "title": {
+            "en": "Reachable",
+            "nl": "Bereikbaar"
+          }
+        }
+      },
+      "pair": [
+        {
+          "id": "connection_test"
+        },
+        {
+          "id": "list_devices",
+          "template": "list_devices",
+          "navigation": {
+            "next": "add_devices"
+          }
+        },
+        {
+          "id": "add_devices",
+          "template": "add_devices"
+        }
+      ],
+      "repair": [
+        {
+          "id": "repair_connection"
+        }
+      ],
+      "settings": [
+        {
+          "id": "address",
+          "type": "text",
+          "label": {
+            "en": "Gateway address",
+            "nl": "Gateway-adres"
+          },
+          "hint": {
+            "en": "IP address or hostname of the ESPHome hub (home_io_control). If the hub's address changes (e.g. a new DHCP lease), update it here or use Repair.",
+            "nl": "IP-adres of hostnaam van de ESPHome-hub (home_io_control). Als het adres van de hub verandert (bijv. een nieuwe DHCP-lease), werk het hier bij of gebruik Herstellen."
+          }
+        },
+        {
+          "id": "entityName",
+          "type": "text",
+          "label": {
+            "en": "Firmware entity name",
+            "nl": "Firmware-entiteitnaam"
+          },
+          "hint": {
+            "en": "The exact `name:` of this cover in the ESPHome YAML config. This is this device's stable identity -- renaming it in the firmware orphans this Homey device; re-pair instead.",
+            "nl": "De exacte `name:` van dit raam in de ESPHome-YAML-configuratie. Dit is de stabiele identiteit van dit apparaat -- hernoemen in de firmware maakt dit Homey-apparaat wees; koppel in dat geval opnieuw."
+          }
+        }
+      ]
+    }
+  ],
+  "capabilities": {
+    "alarm_rain_stale": {
+      "type": "boolean",
+      "title": {
+        "en": "Rain feedback outdated",
+        "nl": "Regenfeedback verouderd"
+      },
+      "desc": {
+        "en": "True when the rain status shown is not current -- either no rain reply has ever been received, or the gateway connection is lost/stale. The rain capability keeps showing the last confirmed value in that case; this capability is what tells you it may no longer be accurate.",
+        "nl": "Waar wanneer de getoonde regenstatus niet actueel is -- er is nog nooit een regenantwoord ontvangen, of de gatewayverbinding is verloren/verouderd. De regen-capability blijft in dat geval de laatst bevestigde waarde tonen; deze capability geeft aan dat die mogelijk niet meer klopt."
+      },
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor",
+      "color": "#9E9E9E"
+    }
+  }
+}
