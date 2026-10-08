@@ -2,6 +2,12 @@
 
 const Homey = require('homey');
 
+// Homey's slider UI can call the position listener repeatedly during a single drag gesture, not
+// just once on release. Sending a REST command per intermediate tick would both jitter the
+// physical motor and flood the gateway's constrained ESP32 web server with requests alongside
+// its one open SSE connection -- so only the value the drag settles on actually gets sent.
+const POSITION_DEBOUNCE_MS = 300;
+
 /**
  * One VELUX roof window, bound to a single "cover" entity on a shared Gateway (lib/Gateway.js).
  *
@@ -41,11 +47,14 @@ const Homey = require('homey');
 class VeluxWindowDevice extends Homey.Device {
 
   async onInit() {
+    await this._migrateCapabilities();
+
     this._entityName = this.getData().id;
     this._rainSensorName = `${this._entityName} Rain sensor`;
     this._ventilationButtonName = `${this._entityName} Ventilation Position`;
     this._gatewayAcquired = false;
     this._lastCommand = null; // 'venting' right after a ventilation command; cleared by any other command
+    this._positionDebounceTimer = null;
 
     this.registerCapabilityListener('windowcoverings_state', (value) => this._onSetState(value));
     this.registerCapabilityListener('windowcoverings_set', (value) => this._onSetPosition(value));
@@ -54,6 +63,24 @@ class VeluxWindowDevice extends Homey.Device {
     await this._connectGateway(this.getSetting('address'));
 
     this.log(`VeluxWindowDevice "${this._entityName}" initialized (gateway: ${this._address})`);
+  }
+
+  /**
+   * One-time migration for devices paired before `window_state` was added / `alarm_rain_stale`
+   * was removed. Homey does NOT retroactively apply a driver's updated `capabilities` list to
+   * already-paired devices on an app update -- without this, a device paired under the old
+   * capability set keeps `alarm_rain_stale` listed with no capability definition left to back
+   * it (removed from this app entirely), which crashes the Homey app's generated device
+   * controls (`Cannot read property 'setable' of undefined`). Idempotent and safe to leave in
+   * place for devices that already have the correct set (pre-existing or newly paired).
+   */
+  async _migrateCapabilities() {
+    if (this.hasCapability('alarm_rain_stale')) {
+      await this.removeCapability('alarm_rain_stale').catch((err) => this.error('removeCapability(alarm_rain_stale) failed:', err));
+    }
+    if (!this.hasCapability('window_state')) {
+      await this.addCapability('window_state').catch((err) => this.error('addCapability(window_state) failed:', err));
+    }
   }
 
   async onSettings({ oldSettings, newSettings, changedKeys }) {
@@ -69,6 +96,10 @@ class VeluxWindowDevice extends Homey.Device {
   }
 
   async onUninit() {
+    if (this._positionDebounceTimer) {
+      clearTimeout(this._positionDebounceTimer);
+      this._positionDebounceTimer = null;
+    }
     this._releaseGateway();
   }
 
@@ -110,7 +141,16 @@ class VeluxWindowDevice extends Homey.Device {
     // `value` is already a 0.0-1.0 fraction (windowcoverings_set's own range) -- the same
     // scale the firmware's /cover/<name>/set?position= endpoint expects, verified live.
     this._lastCommand = null;
-    await this._gateway.setCoverPosition(this._entityName, value);
+    if (this._positionDebounceTimer) clearTimeout(this._positionDebounceTimer);
+    // Resolves immediately -- Homey's own UI already echoes the dragged-to value optimistically
+    // (see "Desired vs. confirmed position" in README.md), so there's nothing lost by not
+    // waiting on the actual (debounced) command below.
+    this._positionDebounceTimer = setTimeout(() => {
+      this._positionDebounceTimer = null;
+      this._gateway.setCoverPosition(this._entityName, value).catch((err) => {
+        this.error('setCoverPosition failed:', err);
+      });
+    }, POSITION_DEBOUNCE_MS);
   }
 
   async _onPressVentilation() {
@@ -172,9 +212,19 @@ class VeluxWindowDevice extends Homey.Device {
   }
 
   _handleState(entity) {
-    if (entity.domain === 'cover' && entity.name === this._entityName) {
+    // Only the very first SSE event for a given entity (the initial connect burst) carries
+    // `domain`/`name` -- every subsequent update (the ones that actually matter, e.g. live
+    // position while moving) omits both and carries only `id` (e.g. "cover/<name>") plus the
+    // changed fields. Confirmed live against the real gateway: relying on `domain`/`name` here
+    // meant every update after the first was silently dropped, forever. `id` is always present.
+    if (typeof entity.id !== 'string') return;
+    const slashIndex = entity.id.indexOf('/');
+    if (slashIndex === -1) return;
+    const domain = entity.id.slice(0, slashIndex);
+    const name = entity.id.slice(slashIndex + 1);
+    if (domain === 'cover' && name === this._entityName) {
       this._handleCoverState(entity);
-    } else if (entity.domain === 'binary_sensor' && entity.name === this._rainSensorName) {
+    } else if (domain === 'binary_sensor' && name === this._rainSensorName) {
       this._handleRainState(entity);
     }
   }

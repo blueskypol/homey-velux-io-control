@@ -97,7 +97,7 @@ which this app does not use). Consequences:
 | Capability | Kind | Source |
 |---|---|---|
 | `windowcoverings_state` | stock (`up`/`idle`/`down`, ternary UI) | open/stop/close control + its own built-in flow trigger/condition/action |
-| `windowcoverings_set` | stock (0.0-1.0, slider, shown as 0-100%, 0 decimals) | position control + its own built-in flow trigger/action |
+| `windowcoverings_set` | stock (0.0-1.0, slider, shown as 0-100%) | position control + its own built-in flow trigger/action |
 | `window_state` | **custom**, defined in this app | derived resting-state label (`closed`/`open`/`venting`) for the device tile; see below |
 | `button.ventilation` | stock `button`, per-device instance | presses the firmware's own `<window> Ventilation Position` button -- **never a synthesized percentage** |
 | `alarm_rain` | stock | this window's own rain sensor, **not** a shared gateway-wide signal -- see below |
@@ -119,6 +119,23 @@ definition: *"0% is closed, 100% is open"*). No scaling or inversion happens any
 app; `device.js` passes the SSE-reported `position` straight into `setCapabilityValue`, and
 the capability's own action sends the raw 0.0-1.0 value straight to
 `/cover/<name>/set?position=`.
+
+### SSE event shape: only the first event per entity carries `domain`/`name`
+
+Confirmed by capturing the raw `/events` stream live against the real gateway while physically
+moving a window: the **first** `state` event for a given entity (the one sent in the initial
+burst right after connecting) carries the full object --
+`{"id", "domain", "name", "value", "state", "current_operation", "position", ...}`. Every
+**subsequent** event for that same entity -- including the ones that actually matter, like live
+position updates while a window is moving -- only carries `{"id", "value", "state",
+"current_operation", "position"}`; `domain` and `name` are omitted entirely, presumably to save
+bandwidth. `id` (e.g. `"cover/Dakraam 1 Overloop"`, always `"<domain>/<name>"`) is the only field
+reliably present on every event. `device.js`'s `_handleState()` dispatches on `id` for exactly
+this reason -- an earlier version dispatched on `domain`/`name` and silently stopped receiving
+any update after the first per entity, forever, which is why position and `window_state` would
+update once on connect and then never again regardless of how many times the window moved
+afterwards. `Gateway.discoverCovers()` doesn't need this fix: it only reads the initial burst,
+which always has the full field set.
 
 ### Desired vs. confirmed position
 
@@ -214,6 +231,12 @@ delivering events again).
 
 ## Known limitations / follow-ups
 
+- `windowcoverings_set`'s percentage can show fractional digits (e.g. "6.98%") since it's the
+  stock capability's own `decimals: 2` on the underlying 0.0-1.0 value. An earlier attempt to
+  force whole percentages via `capabilitiesOptions: { decimals: 0 }` was reverted -- `decimals`
+  rounds the *stored* 0.0-1.0 value, not the displayed percentage, so `0` collapsed the entire
+  range to just `{0, 1}` (closed/fully open) and silently snapped any mid-drag slider value to
+  100% open. No fix attempted yet that doesn't reduce actual position resolution.
 - The device settings screen's **"Connected to"/"Aangesloten"** field (Zonnescherm/Jaloezieën &
   Lamellen/Gordijnen/Jaloezieën/Overig) is a **fixed Homey platform field** tied to the
   `windowcoverings` device class (`allowedVirtual`, confirmed in `homey-lib`'s
@@ -259,6 +282,19 @@ delivering events again).
 - **Physically exercised by the device owner**: open/close/stop/position/ventilation all
   confirmed working against the real windows. Installed persistently via `homey app install`
   (not just a `homey app run` dev session, which uninstalls itself when the CLI disconnects).
+- **Live-usage bug hunt, device owner + raw SSE capture against the real gateway together**:
+  found and fixed the `capabilitiesOptions`-vs-value polarity bug on `alarm_connectivity`
+  ("Reachable: Yes" while disconnected); removed `alarm_rain_stale` as redundant with Homey's
+  own "last updated" tile display; added `window_state`; a one-time `addCapability`/
+  `removeCapability` migration for already-paired devices (Homey doesn't retroactively apply a
+  driver's updated capability list on its own); a `decimals: 0` capability-options attempt to
+  show whole percentages was tried and reverted -- it rounds the *stored* 0.0-1.0 value, not
+  the display, so it silently collapsed the whole slider range to `{0, 1}`; a Gateway SSE
+  reconnect-on-error loop was found and fixed (an explicit teardown-and-reconnect fired
+  regardless of whether the `eventsource` package's own retry had already quietly recovered,
+  fighting it and producing a connect/disconnect loop); and the actual root cause of position
+  feedback never updating after the first event was found by capturing the raw `/events` stream
+  live while physically moving a window -- see "SSE event shape" above.
 - **Still to verify**: a live Insights timeline check for `alarm_rain` (needs a human in the
   Homey mobile app after a real rain transition).
 

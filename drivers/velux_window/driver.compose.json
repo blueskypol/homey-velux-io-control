@@ -21,9 +21,6 @@
     "alarm_connectivity"
   ],
   "capabilitiesOptions": {
-    "windowcoverings_set": {
-      "decimals": 0
-    },
     "button.ventilation": {
       "title": {
         "en": "Ventilation position",
