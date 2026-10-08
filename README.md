@@ -235,8 +235,15 @@ delivering events again).
   reverted -- `decimals` rounds the *stored* 0.0-1.0 value, not the displayed percentage, so `0`
   collapsed the entire range to just `{0, 1}` (closed/fully open) and silently snapped any
   mid-drag slider value to 100% open. `device.js` now rounds the firmware's reported position to
-  whole percent itself (see "Position mapping" above) before storing, which fixes the same
-  display goal without touching capability-declared precision.
+  whole percent before storing (see "Position mapping" above), which is as clean as this app's
+  own code can make it -- but one specific display surface still shows noise regardless: the
+  device-list card's "show position" mode (as opposed to its "show window_state" mode) computes
+  `storedValue * 100` itself and renders the result without rounding, and IEEE-754 double
+  multiplication doesn't always land exactly on the intended integer -- confirmed for 8 of the
+  99 possible whole percentages (7, 14, 28, 29, 55-58), e.g. `0.07 * 100 === 7.000000000000001`
+  in plain JS. The stored value is correct and every other surface (the slider control, the
+  window_state label) rounds its own display correctly; this is a client-side formatting gap in
+  that one specific widget, not something this app's code can reach or work around.
 - Occasional brief SSE drops (a few seconds, self-recovering) still show up in Insights even
   after the Gateway reconnect fixes above -- better than the original multi-hour stuck
   disconnect, but not fully eliminated. Diagnosing further would need visibility this app
