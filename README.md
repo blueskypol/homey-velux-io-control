@@ -97,11 +97,11 @@ which this app does not use). Consequences:
 | Capability | Kind | Source |
 |---|---|---|
 | `windowcoverings_state` | stock (`up`/`idle`/`down`, ternary UI) | open/stop/close control + its own built-in flow trigger/condition/action |
-| `windowcoverings_set` | stock (0.0-1.0, slider, shown as 0-100%) | position control + its own built-in flow trigger/action |
+| `windowcoverings_set` | stock (0.0-1.0, slider, shown as 0-100%, 0 decimals) | position control + its own built-in flow trigger/action |
+| `window_state` | **custom**, defined in this app | derived resting-state label (`closed`/`open`/`venting`) for the device tile; see below |
 | `button.ventilation` | stock `button`, per-device instance | presses the firmware's own `<window> Ventilation Position` button -- **never a synthesized percentage** |
 | `alarm_rain` | stock | this window's own rain sensor, **not** a shared gateway-wide signal -- see below |
-| `alarm_rain_stale` | **custom**, defined in this app | true until the first real rain reply ever arrives, or whenever the gateway connection is lost; see below |
-| `alarm_connectivity` | stock (`true` = disconnected) | driven from the shared Gateway's SSE connection health |
+| `alarm_connectivity` | stock (`true` = disconnected), tile titled "Connection lost" | driven from the shared Gateway's SSE connection health |
 
 Most required flow cards (position changed, rain detected/cleared, rain-is-detected
 condition, reachability changed, is-reachable condition, set position, set state) come for
@@ -128,6 +128,41 @@ the dragged-to slider position immediately and reverts it if the capability list
 rejects -- that already represents "desired" to the user. What's stored (and what you see on
 reopening the device, or in Insights) is always the last position the window itself confirmed.
 
+### Window state (open/closed/venting)
+
+`window_state` is a custom enum capability, derived purely from the confirmed position once
+movement settles to `IDLE`:
+
+- `position === 0` -> `closed`, unambiguously (and clears any pending "venting" expectation).
+- otherwise, if the **last command this app itself sent** was the ventilation button -> `venting`.
+- otherwise -> `open`.
+
+The firmware's REST/SSE API reports a position and a movement direction, never a distinct
+"ventilation mode" -- VELUX's io-homecontrol ventilation command just moves the motor to a
+vendor-internal preset position the gateway doesn't expose as a known fraction (confirmed by
+reading `components/home_io_control/cover.py`: no `ventilation_position:` value exists anywhere
+in config or firmware). So `venting` is a best-effort label based on command history, not a
+hardware-confirmed mode: if the window is later moved by something this app didn't command (the
+physical remote, the gateway's own web dashboard), `window_state` can keep reading `venting`
+until the next command this app recognizes. This is documented in the capability's own
+description, not just here.
+
+### Why there's no separate "Reachable" or "rain is stale" tile
+
+Two tiles from an earlier iteration were removed after live feedback:
+
+- `alarm_connectivity`'s tile was titled "Reachable"/"Bereikbaar", a positive-sense label on a
+  capability whose stock semantics are `true` = **disconnected** (confirmed in `homey-lib`) --
+  the tile showed "Yes" while actually disconnected. Fixed by retitling to "Connection lost"/
+  "Verbinding verbroken", which reads correctly for the same `true`/`false` value; the
+  auto-generated flow cards ("Is connected"/"Is disconnected") were never affected by the tile
+  title and were already correct.
+- A separate `alarm_rain_stale` capability existed to flag when the rain reading might be out of
+  date. Removed: Homey's own device tile already shows "last updated X ago" on tap for every
+  capability, which covers the same need without a second tile. The underlying guarantee this
+  capability was protecting -- `alarm_rain` is **only ever written from a real SSE event**, never
+  defaulted or guessed -- didn't depend on the staleness capability and is unchanged; see below.
+
 ### Rain feedback: per-window, not gateway-wide
 
 Each window has **its own** `"<window name> Rain sensor"` binary_sensor entity. This is
@@ -137,24 +172,24 @@ firmware source (`rain_sensor_poll_interval:` is a per-`cover:` YAML key in
 each window individually "what's your current opening limit", and each window answers from
 its own wired sensor) and empirically: a live test during development showed the two windows
 reporting *different* rain states at the same moment (one dry, one wet). If your installation
-only has one window with a wired rain sensor and others without, only that one window will
-ever get a confirmed (non-stale) `alarm_rain` value -- the others simply never receive a
-binary_sensor reply and stay on `alarm_rain_stale = true` forever, which is correct, not a bug.
+only has one window with a wired rain sensor and others without, that other window's
+`alarm_rain` simply never receives a first value and keeps showing Homey's "no data yet" state
+indefinitely -- which is correct, not a bug.
 
 ### Rain staleness, reconnects, and Insights
 
-- `alarm_rain_stale` starts `true` on every device (re)init and only ever becomes `false` once
-  a *real* `binary_sensor` SSE event for that window's rain sensor arrives -- it is never
-  defaulted to "fresh", and `alarm_rain` itself is never written a default/guessed value at
-  startup (Homey persists its last known value across app/device restarts on its own, which is
-  exactly the desired "keep the last confirmed value" behaviour).
-- On a lost gateway connection, `alarm_rain_stale` is set `true` again (the reading can no
-  longer be trusted as current), but `alarm_rain`'s own value is left untouched -- no
-  fabricated "no rain" default, no fabricated history.
-- On **reconnect**, nothing is back-filled or guessed: the capability only updates again once
-  a genuine new SSE event arrives. No synthesized historical rain transitions are ever
-  produced, by construction (there is no code path that writes `alarm_rain` from anything
-  other than a live SSE `binary_sensor` event).
+- `alarm_rain` is never written a default/guessed value at startup or on reconnect -- it is
+  only ever set from a *real* `binary_sensor` SSE event for that window's rain sensor
+  (`_handleRainState` in `device.js`). Homey persists its last known value across app/device
+  restarts on its own, which is exactly the desired "keep the last confirmed value" behaviour,
+  and a disconnect (see above) never touches `alarm_rain`'s stored value either.
+- On **reconnect**, nothing is back-filled or guessed: the capability only updates again once a
+  genuine new SSE event arrives. No synthesized historical rain transitions are ever produced,
+  by construction (there is no code path that writes `alarm_rain` from anything other than a
+  live SSE `binary_sensor` event).
+- Freshness is communicated via Homey's own native "last updated X ago" display (tap the
+  capability on the device detail screen) rather than a dedicated capability -- see "Why there's
+  no separate... 'rain is stale' tile" above.
 - `alarm_rain` ships with Homey's own `"insights": true` (confirmed in `homey-lib`, not
   assumed) -- every real transition is logged to Insights automatically via the normal
   `setCapabilityValue` call, including rain the module reports on its own steam with no Flow
@@ -169,8 +204,22 @@ connection. `drivers/velux_window/driver.js` keeps one `Gateway` per address; ea
 connection only actually closes once the last device referencing that address is gone --
 **deleting one window's Homey device never disconnects another window on the same gateway.**
 
+**Reconnection**: the `eventsource` package's own internal retry proved unreliable on a
+long-running Homey Pro process -- observed in practice: a connection that went stale for hours
+while the gateway itself stayed genuinely reachable (`ping`/`curl` both succeeded) the whole
+time. `Gateway` now owns reconnection explicitly instead: both an `onerror` and a stale-timeout
+(no events for >90s) explicitly close and recreate the `EventSource` after a delay, with simple
+capped backoff (5s, doubling to a 60s ceiling, reset once a connection actually starts
+delivering events again).
+
 ## Known limitations / follow-ups
 
+- The device settings screen's **"Connected to"/"Aangesloten"** field (Zonnescherm/Jaloezieën &
+  Lamellen/Gordijnen/Jaloezieën/Overig) is a **fixed Homey platform field** tied to the
+  `windowcoverings` device class (`allowedVirtual`, confirmed in `homey-lib`'s
+  `assets/device/classes/windowcoverings.json`) -- apps cannot add options to it. There's no
+  "roof window" choice because Homey's own platform doesn't offer one for this class; "Overig"
+  ("Other") is correct and the only applicable choice, not a gap in this app.
 - Single-gateway identity scheme (see above) -- documented, not yet handled for multiple
   gateways.
 - `support` URL not yet set in `.homeycompose/app.json` -- required only for the "verified"

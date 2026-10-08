@@ -1,0 +1,38 @@
+{
+  "type": "enum",
+  "title": {
+    "en": "Window state",
+    "nl": "Raamstatus"
+  },
+  "desc": {
+    "en": "Closed/open are derived directly from the confirmed position (0% = closed). Venting reflects the last ventilation command sent through this app and may go stale if the window is later moved by another means (the physical remote, the gateway's own web dashboard) -- the firmware reports a position, never a distinct \"venting\" mode, so this is a best-effort label, not a hardware-confirmed one.",
+    "nl": "Gesloten/open volgen rechtstreeks uit de bevestigde positie (0% = gesloten). Ventilatie weerspiegelt het laatste ventilatiecommando dat via deze app is verstuurd en kan verouderen als het raam daarna op een andere manier bewogen wordt (de fysieke afstandsbediening, het eigen webdashboard van de gateway) -- de firmware rapporteert een positie, nooit een aparte \"ventilatie\"-modus, dus dit is een best-effort label, geen door de hardware bevestigd label."
+  },
+  "getable": true,
+  "setable": false,
+  "uiComponent": "sensor",
+  "values": [
+    {
+      "id": "closed",
+      "title": {
+        "en": "Closed",
+        "nl": "Gesloten"
+      }
+    },
+    {
+      "id": "open",
+      "title": {
+        "en": "Open",
+        "nl": "Open"
+      }
+    },
+    {
+      "id": "venting",
+      "title": {
+        "en": "Ventilating",
+        "nl": "Ventilatie"
+      }
+    }
+  ],
+  "color": "#F5B207"
+}

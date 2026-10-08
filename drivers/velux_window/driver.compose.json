@@ -15,12 +15,15 @@
   "capabilities": [
     "windowcoverings_state",
     "windowcoverings_set",
+    "window_state",
     "button.ventilation",
     "alarm_rain",
-    "alarm_rain_stale",
     "alarm_connectivity"
   ],
   "capabilitiesOptions": {
+    "windowcoverings_set": {
+      "decimals": 0
+    },
     "button.ventilation": {
       "title": {
         "en": "Ventilation position",
@@ -29,8 +32,8 @@
     },
     "alarm_connectivity": {
       "title": {
-        "en": "Reachable",
-        "nl": "Bereikbaar"
+        "en": "Connection lost",
+        "nl": "Verbinding verbroken"
       }
     }
   },

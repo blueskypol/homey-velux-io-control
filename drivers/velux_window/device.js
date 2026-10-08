@@ -29,7 +29,14 @@ const Homey = require('homey');
  * io_device_id in components/home_io_control/cover.py, and by each window getting its own
  * distinctly-named entity over the wire). Two windows reporting the same rain state at the
  * same time (as observed during testing) reflects that it was genuinely raining on both, not
- * that they share one sensor.
+ * that they share one sensor. `alarm_rain` is only ever written from a real SSE event, so an
+ * unknown/stale reading simply keeps showing the last confirmed value rather than ever reading
+ * as a fabricated "no rain" -- Homey's own tile already exposes "last updated" on tap, which is
+ * why this app doesn't duplicate that with a separate staleness capability.
+ *
+ * `window_state` (custom) is a best-effort resting-state label (closed/open/venting) for the
+ * device tile -- see its own capability description for why "venting" is derived from command
+ * history rather than a hardware-confirmed mode.
  */
 class VeluxWindowDevice extends Homey.Device {
 
@@ -37,13 +44,8 @@ class VeluxWindowDevice extends Homey.Device {
     this._entityName = this.getData().id;
     this._rainSensorName = `${this._entityName} Rain sensor`;
     this._ventilationButtonName = `${this._entityName} Ventilation Position`;
-    this._rainKnown = false; // true once a real binary_sensor reply has ever been seen
     this._gatewayAcquired = false;
-
-    // Unknown/stale until a real reply proves otherwise -- never default alarm_rain itself,
-    // Homey already persists its last confirmed value across app/device restarts, which is
-    // exactly the "keep the last confirmed value" behaviour this needs.
-    await this._safeSetCapabilityValue('alarm_rain_stale', true);
+    this._lastCommand = null; // 'venting' right after a ventilation command; cleared by any other command
 
     this.registerCapabilityListener('windowcoverings_state', (value) => this._onSetState(value));
     this.registerCapabilityListener('windowcoverings_set', (value) => this._onSetPosition(value));
@@ -81,20 +83,24 @@ class VeluxWindowDevice extends Homey.Device {
   // action cards) -------------------------------------------------------------------------
 
   async openWindow() {
+    this._lastCommand = null;
     await this._gateway.openCover(this._entityName);
   }
 
   async closeWindow() {
+    this._lastCommand = null;
     await this._gateway.closeCover(this._entityName);
   }
 
   async stopWindow() {
+    this._lastCommand = null;
     await this._gateway.stopCover(this._entityName);
   }
 
   // --- Capability listeners (Homey -> device) ---------------------------------------------
 
   async _onSetState(value) {
+    this._lastCommand = null;
     if (value === 'up') return this._gateway.openCover(this._entityName);
     if (value === 'down') return this._gateway.closeCover(this._entityName);
     return this._gateway.stopCover(this._entityName);
@@ -103,10 +109,14 @@ class VeluxWindowDevice extends Homey.Device {
   async _onSetPosition(value) {
     // `value` is already a 0.0-1.0 fraction (windowcoverings_set's own range) -- the same
     // scale the firmware's /cover/<name>/set?position= endpoint expects, verified live.
+    this._lastCommand = null;
     await this._gateway.setCoverPosition(this._entityName, value);
   }
 
   async _onPressVentilation() {
+    // Only an intent marker for window_state -- see that capability's description for why this
+    // can't be a hardware-confirmed mode on this API.
+    this._lastCommand = 'venting';
     await this._gateway.pressButton(this._ventilationButtonName);
   }
 
@@ -155,11 +165,9 @@ class VeluxWindowDevice extends Homey.Device {
       this.setAvailable().catch((err) => this.error('setAvailable failed:', err));
     } else {
       this.setUnavailable(this.homey.__('device.unreachable')).catch((err) => this.error('setUnavailable failed:', err));
-      // The connection itself is gone, so any rain reading we're still showing can no longer
-      // be trusted as current -- mark it stale without touching alarm_rain's own last
-      // confirmed value (never fabricate a "no rain" default on disconnect).
-      this._safeSetCapabilityValue('alarm_rain_stale', true);
     }
+    // alarm_connectivity is true = disconnected (stock semantics, confirmed in homey-lib) --
+    // its tile title is "Connection lost" precisely so true reads correctly here.
     this._safeSetCapabilityValue('alarm_connectivity', !connected);
   }
 
@@ -179,14 +187,24 @@ class VeluxWindowDevice extends Homey.Device {
     if (operation === 'OPENING') this._safeSetCapabilityValue('windowcoverings_state', 'up');
     else if (operation === 'CLOSING') this._safeSetCapabilityValue('windowcoverings_state', 'down');
     else if (operation === 'IDLE') this._safeSetCapabilityValue('windowcoverings_state', 'idle');
+
+    // Only settle window_state once movement has actually stopped -- windowcoverings_state
+    // already shows up/down while mid-motion, so there's nothing useful to derive before IDLE.
+    if (operation === 'IDLE' && typeof entity.position === 'number') {
+      if (entity.position === 0) {
+        this._lastCommand = null; // reaching fully closed unambiguously isn't "venting"
+        this._safeSetCapabilityValue('window_state', 'closed');
+      } else if (this._lastCommand === 'venting') {
+        this._safeSetCapabilityValue('window_state', 'venting');
+      } else {
+        this._safeSetCapabilityValue('window_state', 'open');
+      }
+    }
   }
 
   _handleRainState(entity) {
     if (typeof entity.value !== 'boolean') return; // defensive: malformed/unexpected frame
-    this._rainKnown = true;
     this._safeSetCapabilityValue('alarm_rain', entity.value);
-    // A real reply just arrived over a connection we know is live -- the reading is current.
-    this._safeSetCapabilityValue('alarm_rain_stale', false);
   }
 
   async _safeSetCapabilityValue(capabilityId, value) {
