@@ -43,18 +43,50 @@
   const addressInput = document.getElementById('address');
   diag('DOM elements found: button=' + !!button + ' input=' + !!addressInput);
 
+  const strings = {
+    en: {
+      title: 'Connect to your gateway',
+      label: 'Gateway address',
+      hint: 'The IP address or hostname of your home_io_control hub, reachable on port 80.',
+      button: 'Test connection',
+      testing: 'Testing...',
+      enterAddress: 'Enter an address first.',
+      unreachable: 'Could not reach a home_io_control gateway at this address: ',
+    },
+    nl: {
+      title: 'Verbind met je gateway',
+      label: 'Gateway-adres',
+      hint: 'Het IP-adres of de hostnaam van je home_io_control-hub, bereikbaar op poort 80.',
+      button: 'Verbinding testen',
+      testing: 'Bezig met testen...',
+      enterAddress: 'Vul eerst een adres in.',
+      unreachable: 'Kon geen home_io_control-gateway bereiken op dit adres: ',
+    },
+  };
+  const detected = typeof Homey.getLanguage === 'function' ? Homey.getLanguage() : 'en';
+  diag('detected language: ' + detected);
+  const t = strings[detected] || strings.en;
+  try {
+    document.getElementById('label-address').textContent = t.label;
+    document.getElementById('hint-address').textContent = t.hint;
+    button.textContent = t.button;
+    Homey.setTitle(t.title);
+  } catch (err) {
+    diag('translation step threw (non-fatal): ' + (err && err.message ? err.message : String(err)));
+  }
+
   button.addEventListener('click', async () => {
     diag('button clicked');
     errorEl.style.display = 'none';
     const address = addressInput.value.trim();
     if (!address) {
-      errorEl.textContent = 'Enter an address first.';
+      errorEl.textContent = t.enterAddress;
       errorEl.style.display = 'block';
       return;
     }
 
     button.disabled = true;
-    button.textContent = 'Testing...';
+    button.textContent = t.testing;
     Homey.showLoadingOverlay();
 
     try {
@@ -64,48 +96,20 @@
       if (result && result.success) {
         Homey.nextView();
       } else {
-        errorEl.textContent = 'Could not reach a home_io_control gateway at this address: '
-          + ((result && result.error) || '?');
+        errorEl.textContent = t.unreachable + ((result && result.error) || '?');
         errorEl.style.display = 'block';
       }
     } catch (err) {
       diag('Homey.emit threw: ' + (err && err.message ? err.message : String(err)));
-      errorEl.textContent = 'Could not reach a home_io_control gateway at this address: '
-        + (err && err.message ? err.message : String(err));
+      errorEl.textContent = t.unreachable + (err && err.message ? err.message : String(err));
       errorEl.style.display = 'block';
     } finally {
       Homey.hideLoadingOverlay();
       button.disabled = false;
-      button.textContent = 'Test connection';
+      button.textContent = t.button;
     }
   });
   diag('click listener attached');
-
-  try {
-    const strings = {
-      en: {
-        title: 'Connect to your gateway',
-        label: 'Gateway address',
-        hint: 'The IP address or hostname of your home_io_control hub, reachable on port 80.',
-        button: 'Test connection',
-      },
-      nl: {
-        title: 'Verbind met je gateway',
-        label: 'Gateway-adres',
-        hint: 'Het IP-adres of de hostnaam van je home_io_control-hub, bereikbaar op poort 80.',
-        button: 'Verbinding testen',
-      },
-    };
-    const detected = typeof Homey.getLanguage === 'function' ? Homey.getLanguage() : 'en';
-    diag('detected language: ' + detected);
-    const t = strings[detected] || strings.en;
-    document.getElementById('label-address').textContent = t.label;
-    document.getElementById('hint-address').textContent = t.hint;
-    button.textContent = t.button;
-    Homey.setTitle(t.title);
-  } catch (err) {
-    diag('translation step threw (non-fatal): ' + (err && err.message ? err.message : String(err)));
-  }
 
   diag('script finished');
 </script>

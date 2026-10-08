@@ -31,44 +31,29 @@
   const button = document.getElementById('next');
   const addressInput = document.getElementById('address');
 
-  button.addEventListener('click', async () => {
-    errorEl.style.display = 'none';
-    const address = addressInput.value.trim();
-    if (!address) {
-      errorEl.textContent = 'Enter an address first.';
-      errorEl.style.display = 'block';
-      return;
-    }
-
-    button.disabled = true;
-    button.textContent = 'Testing...';
-    Homey.showLoadingOverlay();
-
-    try {
-      const result = await Homey.emit('test_connection', { address });
-      if (result && result.success) {
-        Homey.done();
-      } else {
-        errorEl.textContent = 'Could not reconnect: ' + ((result && result.error) || '?');
-        errorEl.style.display = 'block';
-      }
-    } catch (err) {
-      errorEl.textContent = 'Could not reconnect: ' + (err && err.message ? err.message : String(err));
-      errorEl.style.display = 'block';
-    } finally {
-      Homey.hideLoadingOverlay();
-      button.disabled = false;
-      button.textContent = 'Reconnect';
-    }
-  });
-
+  const strings = {
+    en: {
+      title: 'Reconnect this window',
+      label: 'Gateway address',
+      hint: 'Enter the (possibly new) IP address or hostname of the gateway that controls this window.',
+      button: 'Reconnect',
+      testing: 'Testing...',
+      enterAddress: 'Enter an address first.',
+      failed: 'Could not reconnect: ',
+    },
+    nl: {
+      title: 'Dit raam opnieuw verbinden',
+      label: 'Gateway-adres',
+      hint: 'Vul het (mogelijk nieuwe) IP-adres of de hostnaam in van de gateway die dit raam bedient.',
+      button: 'Opnieuw verbinden',
+      testing: 'Bezig met testen...',
+      enterAddress: 'Vul eerst een adres in.',
+      failed: 'Kon niet opnieuw verbinden: ',
+    },
+  };
+  const detected = typeof Homey.getLanguage === 'function' ? Homey.getLanguage() : 'en';
+  const t = strings[detected] || strings.en;
   try {
-    const strings = {
-      en: { title: 'Reconnect this window', label: 'Gateway address', hint: 'Enter the (possibly new) IP address or hostname of the gateway that controls this window.', button: 'Reconnect' },
-      nl: { title: 'Dit raam opnieuw verbinden', label: 'Gateway-adres', hint: 'Vul het (mogelijk nieuwe) IP-adres of de hostnaam in van de gateway die dit raam bedient.', button: 'Opnieuw verbinden' },
-    };
-    const detected = typeof Homey.getLanguage === 'function' ? Homey.getLanguage() : 'en';
-    const t = strings[detected] || strings.en;
     document.getElementById('label-address').textContent = t.label;
     document.getElementById('hint-address').textContent = t.hint;
     button.textContent = t.button;
@@ -76,6 +61,37 @@
   } catch (err) {
     // Swallow -- English defaults (already in the static HTML) still work fine.
   }
+
+  button.addEventListener('click', async () => {
+    errorEl.style.display = 'none';
+    const address = addressInput.value.trim();
+    if (!address) {
+      errorEl.textContent = t.enterAddress;
+      errorEl.style.display = 'block';
+      return;
+    }
+
+    button.disabled = true;
+    button.textContent = t.testing;
+    Homey.showLoadingOverlay();
+
+    try {
+      const result = await Homey.emit('test_connection', { address });
+      if (result && result.success) {
+        Homey.done();
+      } else {
+        errorEl.textContent = t.failed + ((result && result.error) || '?');
+        errorEl.style.display = 'block';
+      }
+    } catch (err) {
+      errorEl.textContent = t.failed + (err && err.message ? err.message : String(err));
+      errorEl.style.display = 'block';
+    } finally {
+      Homey.hideLoadingOverlay();
+      button.disabled = false;
+      button.textContent = t.button;
+    }
+  });
 
   if (typeof Homey.getSetting === 'function') {
     Homey.getSetting('address').then((value) => {
