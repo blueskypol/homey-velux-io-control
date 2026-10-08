@@ -22,5 +22,10 @@
   "author": {
     "name": "Pieterjan Oomen"
   },
+  "source": "https://github.com/blueskypol/homey-velux-io-control",
+  "homepage": "https://github.com/blueskypol/homey-velux-io-control",
+  "bugs": {
+    "url": "https://github.com/blueskypol/homey-velux-io-control/issues"
+  },
   "brandColor": "#365eaa"
 }
