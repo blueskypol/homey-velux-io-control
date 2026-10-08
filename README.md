@@ -1,12 +1,28 @@
 # Velux Roof Windows (home_io_control) -- Homey app
 
 Controls VELUX roof windows directly over the local network, through a self-hosted ESPHome
-gateway running the [home_io_control](https://github.com/laberning/home_io_control) firmware
-(a fork/local checkout of it, in this project's case -- see your own gateway config). No cloud,
-no vendor hub, no Homey "ESPHome Controller" community app in between -- this app talks to the
-gateway's own REST/SSE `web_server:` API directly.
+gateway running the [home_io_control](https://github.com/laberning/home_io_control) firmware.
+No cloud, no vendor hub, no Homey "ESPHome Controller" community app in between -- this app
+talks to the gateway's own REST/SSE `web_server:` API directly.
 
 MIT-licensed -- anyone may use, fork and extend this. See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Firmware
+
+This app is the Homey-side half of a two-repo setup:
+
+- **[laberning/home_io_control](https://github.com/laberning/home_io_control)** -- the
+  open-source ESPHome component actually flashed onto the gateway. This app depends on it but
+  doesn't vendor or modify it; it's a plain upstream clone, no fork.
+- The specific board config used to flash *this* project's gateway (a Heltec WiFi LoRa 32
+  V4.3.1, pins/radio settings for the SX1262 + KCT8103L front-end module, the `web_server:`
+  block this app's REST/SSE calls depend on, `rain_sensor_poll_interval:` and the window
+  entities themselves) is a local, project-specific YAML file
+  (`config/my-velux-hub.yaml` in a `home_io_control` checkout) -- not part of the upstream
+  repo, and not published anywhere by this project. If you're setting up your own gateway,
+  start from `home_io_control`'s own
+  [Getting started](https://github.com/laberning/home_io_control/blob/main/docs/getting-started.md)
+  guide instead of trying to copy that file verbatim.
 
 ## Status
 
@@ -14,7 +30,7 @@ First version. Covers (roof windows) only -- lights, locks, switches and climate
 `home_io_control` also supports are out of scope for now. Built and validated against:
 
 - **Firmware**: `home_io_control`, ESPHome **2026.9.1**, with `web_server: version: 3` on
-  **port 80** of the gateway (see that project's `config/my-velux-hub.yaml`).
+  **port 80** of the gateway.
 - **Homey SDK**: v3, `compatibility: ">=12.11.0"` (the floor required by the stock
   `alarm_rain` capability -- confirmed via `homey app validate`, not assumed).
 - **Homey CLI**: 4.3.1.
