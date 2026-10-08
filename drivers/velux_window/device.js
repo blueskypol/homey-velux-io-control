@@ -230,8 +230,15 @@ class VeluxWindowDevice extends Homey.Device {
   }
 
   _handleCoverState(entity) {
-    if (typeof entity.position === 'number') {
-      this._safeSetCapabilityValue('windowcoverings_set', entity.position);
+    // The firmware's reported position can carry float noise (e.g. 0.073105 rather than a
+    // clean 0.07) -- round to the capability's own declared precision (decimals: 2, i.e. whole
+    // percent) once, here, rather than relying on every display surface to round it
+    // consistently (confirmed live: the device-list summary card doesn't, and showed the raw
+    // value's full decimal expansion). window_state's closed-check reuses this same rounded
+    // value so a near-zero float doesn't stop it from registering as "closed".
+    const position = typeof entity.position === 'number' ? Math.round(entity.position * 100) / 100 : null;
+    if (position !== null) {
+      this._safeSetCapabilityValue('windowcoverings_set', position);
     }
     const operation = entity.current_operation;
     if (operation === 'OPENING') this._safeSetCapabilityValue('windowcoverings_state', 'up');
@@ -240,8 +247,8 @@ class VeluxWindowDevice extends Homey.Device {
 
     // Only settle window_state once movement has actually stopped -- windowcoverings_state
     // already shows up/down while mid-motion, so there's nothing useful to derive before IDLE.
-    if (operation === 'IDLE' && typeof entity.position === 'number') {
-      if (entity.position === 0) {
+    if (operation === 'IDLE' && position !== null) {
+      if (position === 0) {
         this._lastCommand = null; // reaching fully closed unambiguously isn't "venting"
         this._safeSetCapabilityValue('window_state', 'closed');
       } else if (this._lastCommand === 'venting') {
