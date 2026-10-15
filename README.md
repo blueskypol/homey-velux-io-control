@@ -34,6 +34,9 @@ First version. Covers (roof windows) only -- lights, locks, switches and climate
 - **Homey SDK**: v3, `compatibility: ">=12.11.0"` (the floor required by the stock
   `alarm_rain` capability -- confirmed via `homey app validate`, not assumed).
 - **Homey CLI**: 4.3.1.
+- **Testing**: manually tested against 2 real VELUX roof windows on a self-hosted gateway --
+  pairing, open/close/stop/position/ventilation, rain feedback, and reconnect behaviour all
+  verified live. No automated test suite yet; see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 If you reflash the gateway with `web_server:` on a different port, or remove/rename the
 `rain_sensor_poll_interval:`/`Ventilation Position` entities this app depends on, update the
@@ -231,93 +234,35 @@ delivering events again).
 
 ## Known limitations / follow-ups
 
-- An earlier attempt to force whole percentages via `capabilitiesOptions: { decimals: 0 }` was
-  reverted -- `decimals` rounds the *stored* 0.0-1.0 value, not the displayed percentage, so `0`
-  collapsed the entire range to just `{0, 1}` (closed/fully open) and silently snapped any
-  mid-drag slider value to 100% open. `device.js` now rounds the firmware's reported position to
-  whole percent before storing (see "Position mapping" above), which is as clean as this app's
-  own code can make it -- but one specific display surface still shows noise regardless: the
-  device-list card's "show position" mode (as opposed to its "show window_state" mode) computes
-  `storedValue * 100` itself and renders the result without rounding, and IEEE-754 double
-  multiplication doesn't always land exactly on the intended integer -- confirmed for 8 of the
-  99 possible whole percentages (7, 14, 28, 29, 55-58), e.g. `0.07 * 100 === 7.000000000000001`
-  in plain JS. The stored value is correct and every other surface (the slider control, the
-  window_state label) rounds its own display correctly; this is a client-side formatting gap in
-  that one specific widget, not something this app's code can reach or work around.
-- Occasional brief SSE drops (a few seconds, self-recovering) still show up in Insights even
-  after the Gateway reconnect fixes above -- better than the original multi-hour stuck
-  disconnect, but not fully eliminated. Diagnosing further would need visibility this app
-  doesn't have from the Homey side (ESP32 WiFi signal quality, serial logs during a drop).
+- The device-list card's "show position" display mode can show tiny floating-point noise (e.g.
+  "7.000000000000001%") for 8 of the 99 possible whole percentages -- it computes `storedValue *
+  100` itself without rounding the result, and IEEE-754 double multiplication doesn't always
+  land on an exact integer. The stored value is correct and every other display surface (the
+  slider, the `window_state` label) rounds correctly; this is a client-side formatting gap in
+  that one widget, not something this app's code can reach.
+- Occasional brief SSE drops (a few seconds, self-recovering) can still show up in Insights
+  despite `Gateway.js`'s reconnect-on-error/stale-timeout handling. Diagnosing further would
+  need visibility this app doesn't have from the Homey side (ESP32 WiFi signal quality, serial
+  logs during a drop).
 - The Homey mobile app doesn't always live-refresh an already-open device screen the instant a
   capability value changes -- navigating away and back (or re-opening the device) shows the
-  current value immediately. Confirmed the underlying value itself updates promptly and
-  correctly (`setCapabilityValue` is called as soon as the SSE event arrives); this is Homey
-  client-side rendering behavior, not something this app's code can control.
+  current value immediately. This is Homey client-side rendering behaviour, not something this
+  app's code controls.
 - The device settings screen's **"Connected to"/"Aangesloten"** field (Zonnescherm/Jaloezieën &
   Lamellen/Gordijnen/Jaloezieën/Overig) is a **fixed Homey platform field** tied to the
   `windowcoverings` device class (`allowedVirtual`, confirmed in `homey-lib`'s
   `assets/device/classes/windowcoverings.json`) -- apps cannot add options to it. There's no
   "roof window" choice because Homey's own platform doesn't offer one for this class; "Overig"
   ("Other") is correct and the only applicable choice, not a gap in this app.
-- Single-gateway identity scheme (see above) -- documented, not yet handled for multiple
-  gateways.
+- Single-gateway identity scheme (see "Device identity" above) -- documented, not yet handled
+  for multiple gateways.
 - `support` URL not yet set in `.homeycompose/app.json` -- required only for the "verified"
   App Store tier (`homey app validate --level verified`), not for local testing or a first
   publish.
-- No automated test suite yet; validated via `homey app validate` + live manual testing
-  against a real `home_io_control` gateway and a real Homey Pro (see below).
+- No automated test suite yet; validated via `homey app validate` and manual testing against
+  real hardware. See [CONTRIBUTING.md](CONTRIBUTING.md).
 - Only `cover:` entities are supported. Lights, locks, switches, climate -- all present in
   `home_io_control` -- are not implemented here.
-
-## Manual test log
-
-- `homey app run --remote`: app installs and boots cleanly on the real Homey Pro
-  ("Homey Pro 12b"), both `App#onInit()` and `Driver#onInit()` log success with no errors.
-  Left running so pairing can start immediately.
-- Code review caught and fixed one real bug before this: the gateway address was written to
-  both device `store` and `settings` at pairing time, but `onInit()` read `store` first --
-  an address edited via the Settings UI (not Repair) would have been silently reverted to the
-  stale `store` value on the next app restart. Fixed by making `settings` the single source of
-  truth throughout (`device.js`, `driver.js`).
-- `homey app validate --level publish`: passes.
-- `Gateway.discoverCovers()` against a live gateway: correctly found both configured windows.
-- `Gateway` SSE lifecycle (`acquire`/`release`, connection-change events, state events):
-  verified against the live gateway outside the Homey runtime (`node -e ...`), including a
-  live observation of the two windows reporting *different* rain states at the same time
-  (confirming the per-window, not gateway-wide, rain claim above).
-- Read-only REST call (`GET /cover/<name>`) verified against the live gateway.
-- **Pairing fixed and confirmed live on a real Homey Pro**: the original pairing view used an
-  `onHomeyReady(Homey)` wrapper callback, which the current Homey SDK3 pairing-view runtime
-  never calls (that's an older-SDK convention) -- `Homey` is already a global by the time the
-  `<script>` tag runs; no wrapper needed. Confirmed against the current official docs
-  (`apps.developer.homey.app/advanced/custom-views/custom-pairing-views`) after the symptom
-  (button visibly did nothing, zero backend log activity) made the stale assumption obvious.
-  Both windows paired successfully afterwards, each as its own device with a stable Homey ID,
-  and the shared-Gateway design was confirmed working as intended: pairing two windows on the
-  same address produced exactly one `"Gateway[...] connecting"` log line, not two.
-- **Physically exercised by the device owner**: open/close/stop/position/ventilation all
-  confirmed working against the real windows. Installed persistently via `homey app install`
-  (not just a `homey app run` dev session, which uninstalls itself when the CLI disconnects).
-- **Live-usage bug hunt, device owner + raw SSE capture against the real gateway together**:
-  found and fixed the `capabilitiesOptions`-vs-value polarity bug on `alarm_connectivity`
-  ("Reachable: Yes" while disconnected); removed `alarm_rain_stale` as redundant with Homey's
-  own "last updated" tile display; added `window_state`; a one-time `addCapability`/
-  `removeCapability` migration for already-paired devices (Homey doesn't retroactively apply a
-  driver's updated capability list on its own); a `decimals: 0` capability-options attempt to
-  show whole percentages was tried and reverted -- it rounds the *stored* 0.0-1.0 value, not
-  the display, so it silently collapsed the whole slider range to `{0, 1}`; a Gateway SSE
-  reconnect-on-error loop was found and fixed (an explicit teardown-and-reconnect fired
-  regardless of whether the `eventsource` package's own retry had already quietly recovered,
-  fighting it and producing a connect/disconnect loop); and the actual root cause of position
-  feedback never updating after the first event was found by capturing the raw `/events` stream
-  live while physically moving a window -- see "SSE event shape" above.
-- **Dispatch fix confirmed live by the device owner**: `window_state` now correctly shows
-  "Ventilatie" after pressing the ventilation button on both windows (the first time it ever
-  showed anything other than its initial-connect value), and the device-list summary tile
-  switches from a raw percentage to a proper "Open"/"Gesloten" label once a window has moved at
-  least once since the fix was installed.
-- **Still to verify**: a live Insights timeline check for `alarm_rain` (needs a human in the
-  Homey mobile app after a real rain transition).
 
 ## License
 

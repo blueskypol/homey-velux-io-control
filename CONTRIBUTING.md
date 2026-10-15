@@ -37,3 +37,7 @@ homey app validate --level publish
 
 Both should pass. If you're changing `.homeycompose/*`, remember `app.json` is generated --
 don't hand-edit it, edit the compose sources and rebuild.
+
+There's no automated test suite yet -- manually verify your change against a real
+`home_io_control` gateway and a real Homey (`homey app run --remote`) before opening a PR,
+especially anything touching `lib/Gateway.js`'s SSE handling or a capability's stored value.
